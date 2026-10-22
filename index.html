@@ -1,0 +1,356 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Steak Clicker</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#101018;color:white;font-family:system-ui,sans-serif;text-align:center}
+header{padding:22px 10px;background:linear-gradient(135deg,#50140f,#171722);border-bottom:2px solid #ff762e}
+h1{margin:0;font-size:clamp(30px,8vw,48px)}
+header p{color:#ffc38c}
+main{max-width:620px;margin:auto;padding:15px}
+.stats{display:flex;gap:8px;background:#20202d;padding:13px;border-radius:15px}
+.stat{flex:1;font-size:12px}
+.stat strong{display:block;color:#ffc04a;font-size:20px;overflow-wrap:anywhere}
+.steak{width:min(72vw,280px);height:min(72vw,280px);border:2px solid #ff8144;border-radius:50%;font-size:150px;background:radial-gradient(circle,#702619,#211119 70%);box-shadow:0 0 35px #ff542a55;cursor:pointer;touch-action:manipulation;margin:15px auto;display:block}
+.steak:active{transform:scale(.94)}
+.panel{background:#20202d;border:1px solid #414155;border-radius:14px;padding:14px;margin:14px 0;text-align:left}
+.panel h2{text-align:center;margin:2px 0 12px}
+button{cursor:pointer;touch-action:manipulation}
+.buy{background:#24c85a;color:#06170a;border:0;border-radius:9px;padding:11px;font-weight:800}
+.buy:disabled{opacity:.4}
+.upgrade{display:flex;align-items:center;gap:10px;background:#292938;border-radius:11px;padding:12px;margin:9px 0}
+.info{flex:1;font-weight:700}
+.info small{display:block;color:#c3c3d3;font-weight:400;margin-top:4px}
+.challenge{border-color:#ffb43c}
+.bar{height:10px;background:#11111a;border-radius:9px;overflow:hidden;margin:10px 0}
+.bar div{height:100%;width:0;background:linear-gradient(90deg,#ff6a28,#ffdb45)}
+.full{width:100%;margin-top:8px}
+.secondary{background:#353548;color:white;border:1px solid #64647c;border-radius:9px;padding:10px}
+#message{min-height:25px;color:#ffbd68}
+footer{padding:22px;color:#9999ad;font-size:12px}
+</style>
+</head>
+<body>
+<header>
+<h1>🥩 STEAK CLICKER 🥩</h1>
+<p>Click. Collect. Rebirth. Dominate.</p>
+</header>
+
+<main>
+<div class="stats">
+<div class="stat">🥩 STEAKS<strong id="score">0</strong></div>
+<div class="stat">👆 PER CLICK<strong id="power">1</strong></div>
+<div class="stat">🔥 PER SECOND<strong id="sps">0</strong></div>
+</div>
+
+<p id="message">FREE STRAWBERRY ELEPHANT!</p>
+<button class="steak" id="steak" aria-label="Click the steak">🥩</button>
+<button class="secondary" id="sound">🔊 Voice ON</button>
+
+<div class="panel">
+<h2>👑 Rebirths</h2>
+<p>Rebirths: <strong id="rebirths">0</strong> / 5</p>
+<p>Permanent multiplier: <strong id="multiplier">x1</strong></p>
+<p>Next rebirth cost: <strong id="rebirthCost">1M</strong></p>
+<button class="buy full" id="rebirth">REBIRTH 🔥</button>
+<p id="rebirthInfo">Reset steaks and upgrades to rebirth. Your multipliers stay!</p>
+</div>
+
+<div class="panel challenge">
+<h2>⏱️ 5-Minute Challenge</h2>
+<p id="challengeName">Loading challenge...</p>
+<div class="bar"><div id="bar"></div></div>
+<p id="challengeProgress">0 / 50</p>
+<p>New challenge in: <strong id="timer">5:00</strong></p>
+<p id="challengeStatus">Complete the challenge for a permanent x1 multiplier!</p>
+</div>
+
+<div class="panel">
+<h2>🏆 Achievements</h2>
+<p id="achievementCount">0 achievements unlocked</p>
+<div id="achievements"></div>
+</div>
+
+<div class="panel">
+<h2>🛒 Upgrade Shop</h2>
+<div id="shop"></div>
+</div>
+
+<button class="secondary full" id="reset">Reset ALL progress</button>
+</main>
+<footer>Steak Clicker · Build your steak empire</footer>
+
+<script>
+const upgrades=[
+{name:"Better Clicking",icon:"👆",desc:"+1 base steak per click",base:25,power:1,rate:0},
+{name:"Mini Grill",icon:"🍳",desc:"+1 steak per second",base:60,power:0,rate:1},
+{name:"Cow Farm",icon:"🐄",desc:"+5 steaks per second",base:250,power:0,rate:5},
+{name:"Steak Factory",icon:"🏭",desc:"+25 steaks per second",base:1000,power:0,rate:25},
+{name:"Steak Empire",icon:"👑",desc:"+100 steaks per second",base:5000,power:0,rate:100}
+];
+
+const rebirthCosts=[
+1000000,
+10000000,
+100000000,
+1000000000,
+50000000000
+];
+
+const challenges=[
+{name:"Steak Collector",desc:"Earn 500 steaks",goal:500,type:"earn",reward:300},
+{name:"Click Frenzy",desc:"Click the steak 50 times",goal:50,type:"click",reward:250},
+{name:"Upgrade Mania",desc:"Buy 3 upgrades",goal:3,type:"buy",reward:400},
+{name:"Big Appetite",desc:"Earn 2,000 steaks",goal:2000,type:"earn",reward:1000}
+];
+
+const achievements=[
+{id:"first",name:"First Bite",desc:"Collect 1 lifetime steak",check:()=>game.total>=1},
+{id:"hundred",name:"Hungry",desc:"Collect 100 lifetime steaks",check:()=>game.total>=100},
+{id:"thousand",name:"Steak Addict",desc:"Collect 1,000 lifetime steaks",check:()=>game.total>=1000},
+{id:"million",name:"Millionaire",desc:"Hold 1 million steaks",check:()=>game.score>=1000000},
+{id:"rebirth1",name:"New Beginning",desc:"Perform your first rebirth",check:()=>game.rebirths>=1},
+{id:"rebirth5",name:"Steak Legend",desc:"Perform all 5 rebirths",check:()=>game.rebirths>=5},
+{id:"clicks",name:"Finger of Steel",desc:"Click 500 times",check:()=>game.clicks>=500},
+{id:"challenge1",name:"Challenge Accepted",desc:"Complete a timed challenge",check:()=>game.completedChallenges>=1},
+{id:"challenge10",name:"Challenge Champion",desc:"Complete 10 timed challenges",check:()=>game.completedChallenges>=10}
+];
+
+function defaults(){
+return {
+score:0,total:0,power:1,rebirths:0,clicks:0,
+sound:true,owned:[0,0,0,0,0],unlocked:[],
+completedChallenges:0,challengeIndex:0,challengeProgress:0,
+challengeDone:false,challengeEnd:Date.now()+300000,
+activeChallengeClicks:0,activeChallengeBuys:0
+};
+}
+let game=defaults();
+
+try{
+const s=JSON.parse(localStorage.getItem("steakClickerSave"));
+if(s&&Number.isFinite(s.score)&&s.score>=0&&
+Number.isFinite(s.total)&&s.total>=0&&
+Number.isInteger(s.rebirths)&&s.rebirths>=0&&s.rebirths<=5&&
+Number.isFinite(s.power)&&s.power>=1&&
+Array.isArray(s.owned)&&s.owned.length===5&&
+s.owned.every(n=>Number.isInteger(n)&&n>=0&&n<1000000)&&
+Array.isArray(s.unlocked)){
+game={...defaults(),...s};
+game.unlocked=game.unlocked.filter(id=>achievements.some(a=>a.id===id));
+}
+}catch(e){}
+
+function save(){
+try{localStorage.setItem("steakClickerSave",JSON.stringify(game))}catch(e){}
+}
+function fmt(n){
+if(!Number.isFinite(n))return "MAX";
+if(n<1000000)return Math.floor(n).toLocaleString("en-GB");
+if(n<1e9)return (n/1e6).toFixed(2)+"M";
+if(n<1e12)return (n/1e9).toFixed(2)+"B";
+return (n/1e12).toFixed(2)+"T";
+}
+function multiplier(){
+return 1+game.rebirths+game.completedChallenges;
+}
+function rate(){
+return upgrades.reduce((s,u,i)=>s+u.rate*game.owned[i],0)*multiplier();
+}
+function clickPower(){
+return game.power*multiplier();
+}
+function cost(u,i){
+return Math.floor(u.base*Math.pow(1.5,game.owned[i]));
+}
+function rebirthCost(){
+return rebirthCosts[game.rebirths]??Infinity;
+}
+
+function sayMeme(){
+if(!game.sound||!("speechSynthesis" in window))return;
+speechSynthesis.cancel();
+const voice=new SpeechSynthesisUtterance("FREE STRAWBERRY ELEPHANT!");
+voice.lang="en-GB";
+voice.rate=1.2;
+voice.pitch=1.5;
+speechSynthesis.speak(voice);
+}
+
+function checkAchievements(){
+for(const a of achievements){
+if(a.check()&&!game.unlocked.includes(a.id)){
+game.unlocked.push(a.id);
+document.getElementById("message").textContent="🏆 Achievement unlocked: "+a.name+"!";
+}
+}
+}
+
+function earn(n){
+game.score+=n;
+game.total+=n;
+if(!game.challengeDone&&challenges[game.challengeIndex].type==="earn"){
+game.challengeProgress+=n;
+}
+checkAchievements();
+}
+
+function clickSteak(){
+earn(clickPower());
+game.clicks++;
+if(!game.challengeDone&&challenges[game.challengeIndex].type==="click"){
+game.challengeProgress++;
+}
+document.getElementById("message").textContent="+"+fmt(clickPower())+" STEAKS!";
+sayMeme();
+finishChallenge();
+render();
+save();
+}
+
+function buy(i){
+const u=upgrades[i],price=cost(u,i);
+if(game.score<price)return;
+game.score-=price;
+game.power+=u.power;
+game.owned[i]++;
+if(!game.challengeDone&&challenges[game.challengeIndex].type==="buy"){
+game.challengeProgress++;
+}
+finishChallenge();
+checkAchievements();
+render();save();
+}
+
+function doRebirth(){
+const price=rebirthCost();
+if(game.rebirths>=5){
+document.getElementById("message").textContent="🏆 Maximum rebirths reached!";
+return;
+}
+if(game.score<price){
+document.getElementById("message").textContent="You need "+fmt(price)+" steaks to rebirth!";
+return;
+}
+if(!confirm("Rebirth? Your steaks and upgrades reset, but your multiplier stays!"))return;
+game.rebirths++;
+game.score=0;
+game.power=1;
+game.owned=[0,0,0,0,0];
+checkAchievements();
+render();save();
+document.getElementById("message").textContent="🔥 REBIRTH! Permanent multiplier increased!";
+}
+
+function finishChallenge(){
+const c=challenges[game.challengeIndex];
+if(!game.challengeDone&&game.challengeProgress>=c.goal){
+game.challengeDone=true;
+game.completedChallenges++;
+game.score+=c.reward;
+game.total+=c.reward;
+document.getElementById("message").textContent=
+"🏆 Challenge completed! +"+fmt(c.reward)+" steaks and permanent x1 multiplier!";
+checkAchievements();
+}
+}
+
+function nextChallenge(){
+game.challengeIndex=(game.challengeIndex+1)%challenges.length;
+game.challengeProgress=0;
+game.challengeDone=false;
+game.activeChallengeClicks=0;
+game.activeChallengeBuys=0;
+game.challengeEnd=Date.now()+300000;
+save();render();
+}
+
+function render(){
+document.getElementById("score").textContent=fmt(game.score);
+document.getElementById("power").textContent=fmt(clickPower());
+document.getElementById("sps").textContent=fmt(rate());
+document.getElementById("rebirths").textContent=game.rebirths;
+document.getElementById("multiplier").textContent="x"+multiplier();
+document.getElementById("rebirthCost").textContent=fmt(rebirthCost());
+document.getElementById("rebirth").disabled=game.score<rebirthCost()||game.rebirths>=5;
+document.getElementById("rebirthInfo").textContent=game.rebirths>=5?
+"Maximum rebirths reached!":"Next rebirth gives +1 permanent multiplier.";
+document.getElementById("sound").textContent=game.sound?"🔊 Voice ON":"🔇 Voice OFF";
+
+const shop=document.getElementById("shop");
+shop.replaceChildren();
+upgrades.forEach((u,i)=>{
+const row=document.createElement("div");row.className="upgrade";
+const info=document.createElement("div");info.className="info";
+info.textContent=u.icon+" "+u.name;
+const small=document.createElement("small");
+small.textContent=u.desc+" · Owned: "+game.owned[i];
+info.appendChild(small);
+const btn=document.createElement("button");btn.className="buy";
+btn.textContent="🥩 "+fmt(cost(u,i));
+btn.disabled=game.score<cost(u,i);
+btn.addEventListener("click",()=>buy(i));
+row.append(info,btn);shop.appendChild(row);
+});
+
+const c=challenges[game.challengeIndex];
+document.getElementById("challengeName").textContent=
+c.name+": "+c.desc+" (Reward: "+fmt(c.reward)+" steaks)";
+document.getElementById("challengeProgress").textContent=
+fmt(Math.min(game.challengeProgress,c.goal))+" / "+fmt(c.goal);
+document.getElementById("bar").style.width=
+Math.min(100,game.challengeProgress/c.goal*100)+"%";
+document.getElementById("challengeStatus").textContent=
+game.challengeDone?"Completed! Permanent multiplier +1 awarded.":"Complete it before the timer runs out!";
+
+document.getElementById("achievementCount").textContent=
+game.unlocked.length+" / "+achievements.length+" achievements unlocked";
+const list=document.getElementById("achievements");
+list.replaceChildren();
+achievements.forEach(a=>{
+const p=document.createElement("p");
+p.textContent=(game.unlocked.includes(a.id)?"✅ ":"🔒 ")+a.name+" — "+a.desc;
+p.style.color=game.unlocked.includes(a.id)?"#ffc45c":"#bdbdcd";
+list.appendChild(p);
+});
+}
+
+document.getElementById("steak").addEventListener("click",clickSteak);
+document.getElementById("rebirth").addEventListener("click",doRebirth);
+document.getElementById("sound").addEventListener("click",()=>{
+game.sound=!game.sound;
+if(!game.sound&&"speechSynthesis"in window)speechSynthesis.cancel();
+render();save();
+});
+document.getElementById("reset").addEventListener("click",()=>{
+if(!confirm("Delete ALL progress, rebirths and achievements?"))return;
+game=defaults();save();render();
+});
+
+setInterval(()=>{
+const remaining=Math.max(0,game.challengeEnd-Date.now());
+const secs=Math.ceil(remaining/1000);
+document.getElementById("timer").textContent=
+Math.floor(secs/60)+":"+String(secs%60).padStart(2,"0");
+if(remaining<=0)nextChallenge();
+},250);
+
+setInterval(()=>{
+const r=rate();
+if(r>0){
+earn(r);
+finishChallenge();
+render();
+}
+},1000);
+
+setInterval(save,5000);
+checkAchievements();
+render();
+</script>
+</body>
+</html>
